@@ -1,0 +1,90 @@
+---
+- name: Set up MariaDB and grant access to webserver
+  hosts: db
+  become: true
+  vars:
+    db_root_pass: Unix2025
+
+  tasks:
+    - name: Check if Docker is installed
+      command: docker --version
+      register: docker_installed
+      ignore_errors: true
+
+    - name: Install Docker if not present
+      become: yes
+      block:
+        - name: Install required system packages
+          apt:
+            name:
+              - ca-certificates
+              - curl
+              - gnupg
+            state: present
+            update_cache: yes
+
+        - name: Add Docker GPG key
+          shell: |
+            install -m 0755 -d /etc/apt/keyrings
+            curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+            chmod a+r /etc/apt/keyrings/docker.gpg
+          args:
+            creates: /etc/apt/keyrings/docker.gpg
+
+        - name: Add Docker APT repository
+          shell: |
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(. /etc/os-release && echo $VERSION_CODENAME) stable" > /etc/apt/sources.list.d/docker.list
+          args:
+            creates: /etc/apt/sources.list.d/docker.list
+
+        - name: Update APT cache after adding Docker repo
+          apt:
+            update_cache: yes
+
+        - name: Install Docker packages
+          apt:
+            name:
+              - docker-ce
+              - docker-ce-cli
+              - containerd.io
+              - docker-buildx-plugin
+              - docker-compose-plugin
+            state: present
+            update_cache: yes
+      when: docker_installed.failed
+
+    - name: install pip for docker
+      apt:
+        name:
+          - python3-pip
+          - python3-requests
+        state: present
+        update_cache: yes
+
+    - name: Get webserver connection info
+      set_fact:
+        webserver_ip: "{{ hostvars['webserver-vm'].ansible_host }}"
+        webserver_user: "{{ hostvars['webserver-vm'].ansible_user | default('ubuntu') }}"
+
+    - name: Pull and run MariaDB container
+      community.docker.docker_container:
+        name: mariadb-server
+        image: de1vidas/test-custom-mariadb-virt:latest
+        state: started
+        restart_policy: unless-stopped
+        env:
+          MARIADB_ROOT_PASSWORD: "{{ db_root_pass }}"
+        published_ports:
+          - "3306:3306"
+
+    - name: Wait for MariaDB to start
+      wait_for:
+        port: 3306
+        delay: 10
+
+    - name: Create user for webserver in MariaDB
+      shell: >
+        docker exec mariadb-server /opt/mariadb/bin/mysql -u root -p"{{ db_root_pass }}" --socket=/opt/mariadb/mysql.sock -e
+        "CREATE USER '{{ webserver_user }}'@'{{ webserver_ip }}' IDENTIFIED BY '{{ db_root_pass }}';
+         GRANT ALL PRIVILEGES ON *.* TO '{{ webserver_user }}'@'{{ webserver_ip }}' WITH GRANT OPTION;
+         FLUSH PRIVILEGES;"
