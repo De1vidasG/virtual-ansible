@@ -5,6 +5,7 @@
   vars:
     db_host: "{{ hostvars['db-vm'].ansible_host }}"
     db_user: "{{ ansible_user }}"
+    ansible_become_password: 123
 
   tasks:
     - name: Check if Docker is installed
