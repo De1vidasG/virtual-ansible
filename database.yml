@@ -22,7 +22,7 @@
 
     - name: add Dockers repo
       apt_repository:
-        repo: deb https://download.docker.com/linux/debian bookwarm stable
+        repo: deb https://download.docker.com/linux/debian bookworm stable
 
     - name: install docker packages
       apt:
