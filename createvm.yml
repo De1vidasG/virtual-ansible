@@ -1,0 +1,58 @@
+---
+- name: Create Webserver VM in OpenNebula
+  hosts: localhost
+  become: true
+
+  tasks:
+    - name: python3-pip install
+      apt:
+        name: python3-pip
+        state: present
+        update_cache: yes
+
+    - name: Install pyone library for one_vm
+      pip:
+        name: pyone
+        extra_args: --break-system-packages
+        state: present
+
+    - name: Create web-VM
+      community.general.one_vm:
+        api_url: https://grid5.mif.vu.lt/cloud3/RPC2
+        api_username: #person nr1 mif username
+        api_password: #person nr1 mif password
+        template_id: 3016
+        attributes:
+          name: webserver-vm
+        disk_size: 6 GB
+        memory: 512 MB
+        vcpu: 1
+        cpu: 0.2
+
+    - name: Create db-VM
+      community.general.one_vm:
+        api_url: https://grid5.mif.vu.lt/cloud3/RPC2
+        api_username: #person nr2 mif username
+        api_password: #person nr2 mif password
+        template_id: 2273
+        attributes:
+          name: database-vm
+        disk_size: 16 GB
+        memory: 512 MB
+        vcpu: 1
+        cpu: 0.2
+
+    - name: Create client-VM
+      community.general.one_vm:
+        api_url: https://grid5.mif.vu.lt/cloud3/RPC2
+        api_username: #person nr3 mif username
+        api_password: #person nr3 mif password
+        template_id: 3016
+        attributes:
+          name: client-vm
+        disk_size: 6 GB
+        memory: 512 MB
+        vcpu: 1
+        cpu: 0.2
+
+# add IP and username extraction to hosts.ini???
